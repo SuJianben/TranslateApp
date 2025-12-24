@@ -208,7 +208,12 @@
             if (!apiUrl) { alert("请先粘贴 Google Script URL"); return; }
             localStorage.setItem('gas_url', apiUrl);
 
-            const sourceLang = sourceLangSelect.value;
+            // 🟢 修复开始：如果是 auto，就变成空字符串
+            let sourceLang = sourceLangSelect.value;
+            if (sourceLang === 'auto') {
+                sourceLang = "";  // Google 规定：空字符串 = 自动检测
+            }
+            // 🟢 修复结束
             btnTranslate.disabled = true;
             progressContainer.style.display = 'block';
 
