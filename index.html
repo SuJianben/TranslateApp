@@ -58,7 +58,11 @@
                 <option value="ko">韩语 (Korean)</option>
                 <option value="auto">自动检测 (Auto)</option>
             </select>
-            <span>➡ 中文 (zh-CN)</span>
+            <div style="display:flex; align-items:center; gap:5px;">
+                <span>➡ 目标:</span>
+                <input type="text" id="targetLangInput" value="zh-CN" placeholder="如: en, ja" style="width: 60px; padding: 8px; margin:0; text-align:center;" title="输入语言代码，例如: en=英语, ja=日语, fr=法语">
+                <a href="https://cloud.google.com/translate/docs/languages" target="_blank" style="font-size:12px; text-decoration:none; color:#4285F4;">📋代码表</a>
+            </div>
 
             <input type="file" id="fileInput" accept=".xlsx, .xls, .csv" />
             
@@ -170,9 +174,10 @@
             statusDiv.innerText = `已选中第 ${index+1} 列`;
         }
 
-        async function fetchBatchTranslate(textArray, sourceLang) {
+        async function fetchBatchTranslate(textArray, sourceLang, targetLang) {
             const apiUrl = scriptUrlInput.value.trim();
-            const payload = { texts: textArray, source: sourceLang, target: "zh-CN" };
+            // 🟢 把 targetLang 放入数据包
+            const payload = { texts: textArray, source: sourceLang, target: targetLang };
 
             try {
                 const response = await fetch(apiUrl, {
@@ -214,6 +219,14 @@
                 sourceLang = "";  // Google 规定：空字符串 = 自动检测
             }
             // 🟢 修复结束
+
+            // 🟢 新增：获取目标语言输入框
+            const targetLangInput = document.getElementById('targetLangInput');
+            let targetLang = targetLangInput.value.trim(); // 去除空格
+            if (!targetLang) {
+                targetLang = "zh-CN"; // 如果用户删空了，默认回中文
+            }
+            
             btnTranslate.disabled = true;
             progressContainer.style.display = 'block';
 
@@ -237,7 +250,7 @@
                 const chunkIndices = indices.slice(k, k + BATCH_SIZE);
                 statusDiv.innerText = `正在翻译... ${k}/${totalItems}`;
 
-                const results = await fetchBatchTranslate(chunkTexts, sourceLang);
+                const results = await fetchBatchTranslate(chunkTexts, sourceLang, targetLang);
 
                 if (results && results.length === chunkTexts.length) {
                     for (let r = 0; r < results.length; r++) {
