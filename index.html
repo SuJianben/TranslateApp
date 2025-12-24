@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Google 批量翻译</title>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background-color: #f0f2f5; padding: 20px; display: flex; flex-direction: column; align-items: center; }
+        .container { background: white; padding: 30px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); width: 90%; max-width: 1000px; }
+        h2 { color: #4285F4; margin-bottom: 20px; }
+        
+        .controls { 
+            display: flex; gap: 15px; margin-bottom: 20px; align-items: center; flex-wrap: wrap; 
+            background: #e8f0fe; padding: 20px; border-radius: 8px; border: 1px solid #d2e3fc;
+        }
+        
+        input[type="text"] { width: 100%; padding: 10px; margin-bottom: 10px; border: 2px solid #4285F4; border-radius: 5px; font-family: monospace; }
+        select, input[type="file"] { padding: 10px; border-radius: 5px; border: 1px solid #ccc; }
+        button { padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; transition: 0.2s; color: white; font-size: 14px; }
+        
+        .btn-translate { background-color: #4285F4; }
+        .btn-translate:hover { background-color: #3367d6; }
+        .btn-export { background-color: #34a853; }
+        .btn-export:hover { background-color: #2d8e46; }
+        .btn-csv { background-color: #fbbc05; color: #333; }
+        .btn-csv:hover { background-color: #f9a825; }
+        button:disabled { background-color: #ccc; cursor: not-allowed; color: #fff; }
+
+        .table-wrapper { max-height: 500px; overflow: auto; border: 1px solid #ddd; margin-top: 10px; }
+        table { width: 100%; border-collapse: collapse; font-size: 14px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #f8f9fa; cursor: pointer; position: sticky; top: 0; z-index: 10; }
+        th:hover { background-color: #e2e6ea; }
+        .selected-col { background-color: #e8f0fe; }
+        th.selected-header { background-color: #4285F4; color: white; }
+        
+        .progress-container { width: 100%; background-color: #eee; border-radius: 10px; margin-top: 15px; display: none; }
+        .progress-bar { height: 10px; width: 0%; background-color: #4285F4; border-radius: 10px; transition: width 0.3s; }
+        .status { margin-top: 10px; color: #555; font-size: 14px; white-space: pre-wrap; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h2>🚀 Google 批量翻译 (最终稳定版)</h2>
+        
+        <label style="font-weight: bold; display:block; margin-bottom:5px;">粘贴 Google Script URL:</label>
+        <input type="text" id="scriptUrl" placeholder="https://script.google.com/macros/s/AKfycbzjCrd4SIwoR_6M9Dx_3Lgm-Y4xFd8VBgmV2btY-L4XYkuXuUPuDPA2E7BWa8UwADdvFA/exec" />
+
+        <div class="controls">
+            <label>源语言:</label>
+            <select id="sourceLang">
+                <option value="en">英语 (English)</option>
+                <option value="nl">荷兰语 (Dutch)</option>
+                <option value="de">德语 (German)</option>
+                <option value="fr">法语 (French)</option>
+                <option value="ja">日语 (Japanese)</option>
+                <option value="ko">韩语 (Korean)</option>
+                <option value="auto">自动检测 (Auto)</option>
+            </select>
+            <span>➡ 中文 (zh-CN)</span>
+
+            <input type="file" id="fileInput" accept=".xlsx, .xls, .csv" />
+            
+            <button id="btnTranslate" class="btn-translate" disabled>开始批量翻译</button>
+            <button id="btnExport" class="btn-export" disabled>导出 Excel (.xlsx)</button>
+            <button id="btnExportCSV" class="btn-csv" disabled>导出 CSV (防乱码)</button>
+        </div>
+
+        <div id="status" class="status">等待上传文件...</div>
+        <div class="progress-container" id="progressContainer">
+            <div class="progress-bar" id="progressBar"></div>
+        </div>
+
+        <div class="table-wrapper">
+            <table id="dataTable"></table>
+        </div>
+    </div>
+
+    <script>
+        // 🟢 新增：使用 Node.js 方式引入库
+        const XLSX = require('xlsx');
+        let globalWorkbook = null;
+        let globalData = [];
+        let selectedColIndex = -1;
+
+        const fileInput = document.getElementById('fileInput');
+        const table = document.getElementById('dataTable');
+        const statusDiv = document.getElementById('status');
+        const btnTranslate = document.getElementById('btnTranslate');
+        const btnExport = document.getElementById('btnExport');
+        const btnExportCSV = document.getElementById('btnExportCSV');
+        const progressContainer = document.getElementById('progressContainer');
+        const progressBar = document.getElementById('progressBar');
+        const sourceLangSelect = document.getElementById('sourceLang');
+        const scriptUrlInput = document.getElementById('scriptUrl');
+
+        if(localStorage.getItem('gas_url')) {
+            scriptUrlInput.value = localStorage.getItem('gas_url');
+        }
+
+        // --- 1. 修复读取逻辑：改回最安全的自动检测 ---
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            
+            reader.onload = (e) => {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    // ❌ 删除了 {codepage: 65001}，改回自动检测
+                    // 这样无论是 xlsx 还是 csv，库都会自己判断，不会报错了
+                    globalWorkbook = XLSX.read(data, {type: 'array'});
+                    
+                    const ws = globalWorkbook.Sheets[globalWorkbook.SheetNames[0]];
+                    globalData = XLSX.utils.sheet_to_json(ws, {header: 1});
+                    
+                    if(globalData.length === 0) {
+                        statusDiv.innerText = "❌ 文件是空的！";
+                        return;
+                    }
+                    
+                    renderTable();
+                    statusDiv.innerText = `✅ 已加载: ${file.name} (共 ${globalData.length} 行)`;
+                } catch(err) {
+                    console.error("Read Error:", err);
+                    statusDiv.innerText = `❌ 读取文件失败: ${err.message}\n请检查文件是否被其他软件占用，或尝试另存为标准 .xlsx 格式`;
+                }
+            };
+            
+            reader.readAsArrayBuffer(file);
+        });
+
+        function renderTable() {
+            table.innerHTML = '';
+            if (globalData.length === 0) return;
+            const thead = document.createElement('thead');
+            const headerRow = document.createElement('tr');
+            globalData[0].forEach((cell, index) => {
+                const th = document.createElement('th');
+                th.innerText = cell ? String(cell).substring(0, 20) : `Col ${index+1}`;
+                th.onclick = () => selectColumn(index);
+                if (index === selectedColIndex) th.classList.add('selected-header');
+                headerRow.appendChild(th);
+            });
+            thead.appendChild(headerRow);
+            table.appendChild(thead);
+
+            const tbody = document.createElement('tbody');
+            const limit = Math.min(globalData.length, 50); 
+            for (let i = 1; i < limit; i++) {
+                const row = document.createElement('tr');
+                const rowData = globalData[i];
+                const maxCols = globalData[0].length;
+                for (let j = 0; j < maxCols; j++) {
+                    const td = document.createElement('td');
+                    td.innerText = rowData[j] ? String(rowData[j]).substring(0, 50) : '';
+                    if (j === selectedColIndex) td.classList.add('selected-col');
+                    row.appendChild(td);
+                }
+                tbody.appendChild(row);
+            }
+            table.appendChild(tbody);
+        }
+
+        function selectColumn(index) {
+            selectedColIndex = index;
+            renderTable();
+            btnTranslate.disabled = false;
+            statusDiv.innerText = `已选中第 ${index+1} 列`;
+        }
+
+        async function fetchBatchTranslate(textArray, sourceLang) {
+            const apiUrl = scriptUrlInput.value.trim();
+            const payload = { texts: textArray, source: sourceLang, target: "zh-CN" };
+
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    redirect: 'follow',
+                    headers: { "Content-Type": "text/plain;charset=utf-8" },
+                    body: JSON.stringify(payload)
+                });
+                
+                const resultText = await response.text();
+                // 尝试解析 JSON，如果出错则打印原始内容以便调试
+                try {
+                    const jsonResponse = JSON.parse(resultText);
+                    if (jsonResponse.status === "success") {
+                        return jsonResponse.data;
+                    } else {
+                        console.error("GAS Error:", jsonResponse.message);
+                        return null;
+                    }
+                } catch(e) {
+                    console.error("Invalid JSON:", resultText);
+                    return null;
+                }
+            } catch (error) {
+                console.error("Network Error:", error);
+                return null;
+            }
+        }
+
+        btnTranslate.addEventListener('click', async () => {
+            if (selectedColIndex === -1) return;
+            const apiUrl = scriptUrlInput.value.trim();
+            if (!apiUrl) { alert("请先粘贴 Google Script URL"); return; }
+            localStorage.setItem('gas_url', apiUrl);
+
+            const sourceLang = sourceLangSelect.value;
+            btnTranslate.disabled = true;
+            progressContainer.style.display = 'block';
+
+            let batchData = [];
+            let indices = [];
+            const BATCH_SIZE = 50; 
+
+            for (let i = 1; i < globalData.length; i++) {
+                let text = globalData[i][selectedColIndex];
+                if (text) {
+                    batchData.push(String(text));
+                    indices.push(i);
+                }
+            }
+
+            const totalItems = batchData.length;
+            let processedCount = 0;
+            
+            for (let k = 0; k < totalItems; k += BATCH_SIZE) {
+                const chunkTexts = batchData.slice(k, k + BATCH_SIZE);
+                const chunkIndices = indices.slice(k, k + BATCH_SIZE);
+                statusDiv.innerText = `正在翻译... ${k}/${totalItems}`;
+
+                const results = await fetchBatchTranslate(chunkTexts, sourceLang);
+
+                if (results && results.length === chunkTexts.length) {
+                    for (let r = 0; r < results.length; r++) {
+                        globalData[chunkIndices[r]][selectedColIndex] = results[r];
+                    }
+                } else {
+                    statusDiv.innerText += "\n⚠️ 本批次翻译遇到网络波动，跳过...";
+                }
+
+                processedCount += chunkTexts.length;
+                progressBar.style.width = Math.round((processedCount / totalItems) * 100) + "%";
+                await new Promise(r => setTimeout(r, 200));
+            }
+
+            renderTable();
+            statusDiv.innerText = "✅ 翻译完成！建议使用【黄色按钮】导出以防乱码。";
+            btnTranslate.disabled = false;
+            btnExport.disabled = false;
+            btnExportCSV.disabled = false;
+        });
+
+        // 2. 导出 Excel
+        btnExport.addEventListener('click', () => {
+            const newSheet = XLSX.utils.aoa_to_sheet(globalData);
+            const newWorkbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(newWorkbook, newSheet, "Translated");
+            XLSX.writeFile(newWorkbook, "Translated_Result.xlsx");
+        });
+
+        // 3. 导出 CSV (带 BOM 头，解决乱码)
+        btnExportCSV.addEventListener('click', () => {
+            const ws = XLSX.utils.aoa_to_sheet(globalData);
+            const csvContent = XLSX.utils.sheet_to_csv(ws);
+            // 🌟 手动添加 BOM 头
+            const blob = new Blob(["\uFEFF" + csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement("a");
+            const url = URL.createObjectURL(blob);
+            link.setAttribute("href", url);
+            link.setAttribute("download", "Translated_Fix_GBK.csv");
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        });
+
+    </script>
+</body>
+</html>

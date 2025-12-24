@@ -1,0 +1,47 @@
+{
+  "name": "google-translate-tool",
+  "version": "1.0.0",
+  "description": "我的批量翻译神器",
+  "main": "main.js",
+  "author": "Me",
+  "license": "ISC",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder"
+  },
+  "dependencies": {
+    "electron-log": "^5.4.3",
+    "electron-updater": "^6.6.2",
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "electron": "^25.0.0",
+    "electron-builder": "^26.0.12"
+  },
+  "build": {
+    "appId": "com.mytranslate.app",
+    "productName": "批量翻译工具",
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "target": [
+        "nsis"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,           
+      "allowToChangeInstallationDirectory": true, 
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "批量翻译工具",
+      "deleteAppDataOnUninstall": false
+    },
+    "publish": [
+      {
+        "provider": "generic",
+        "url": "http://192.168.1.61:8080/"
+      }
+    ]
+  }
+}

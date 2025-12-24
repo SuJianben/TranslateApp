@@ -1,0 +1,15 @@
+# 忽略依赖库 (太大了，npm install 就能装回来)
+node_modules/
+
+# 忽略打包生成的文件夹 (每次打包都会变，不需要存)
+dist/
+win-unpacked/
+release/
+
+# 忽略日志和系统文件
+*.log
+.DS_Store
+Thumbs.db
+
+# 忽略环境配置 (如果你以后用到 API Key，也不要上传)
+.env
