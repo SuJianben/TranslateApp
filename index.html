@@ -114,7 +114,10 @@
                     const data = new Uint8Array(e.target.result);
                     // ❌ 删除了 {codepage: 65001}，改回自动检测
                     // 这样无论是 xlsx 还是 csv，库都会自己判断，不会报错了
-                    globalWorkbook = XLSX.read(data, {type: 'array'});
+                    globalWorkbook = XLSX.read(data, {
+                        type: 'array',
+                        codepage: 65001 // 65001 代表 UTF-8，这是解决乱码的关键钥匙
+                    });
                     
                     const ws = globalWorkbook.Sheets[globalWorkbook.SheetNames[0]];
                     globalData = XLSX.utils.sheet_to_json(ws, {header: 1});

@@ -1,6 +1,6 @@
 {
   "name": "google-translate-tool",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "我的批量翻译神器",
   "main": "main.js",
   "author": "Me",
