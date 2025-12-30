@@ -3,10 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Google 批量翻译</title>
+    <title>Google 批量翻译 + 数据匹配工具</title>
     <style>
         body { font-family: 'Segoe UI', sans-serif; background-color: #f0f2f5; padding: 20px; display: flex; flex-direction: column; align-items: center; }
-        .container { background: white; padding: 30px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); width: 90%; max-width: 1000px; }
+        .container { background: white; padding: 30px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); width: 90%; max-width: 1000px; margin-bottom: 30px; }
         h2 { color: #4285F4; margin-bottom: 20px; }
         
         .controls { 
@@ -37,15 +37,19 @@
         .progress-container { width: 100%; background-color: #eee; border-radius: 10px; margin-top: 15px; display: none; }
         .progress-bar { height: 10px; width: 0%; background-color: #4285F4; border-radius: 10px; transition: width 0.3s; }
         .status { margin-top: 10px; color: #555; font-size: 14px; white-space: pre-wrap; font-weight: bold; }
+
+        /* 🟢 VLOOKUP 模块专用样式 */
+        .vlookup-box { background: #f8f9fa; padding: 15px; border-radius: 8px; flex: 1; min-width: 300px; border: 1px solid #e0e0e0; }
+        .vlookup-box h4 { margin-top: 0; color: #333; }
     </style>
 </head>
 <body>
 
     <div class="container">
-        <h2>🚀 Google 批量翻译 (最终稳定版)</h2>
+        <h2>🚀 Google 批量翻译 (v1.0.3)</h2>
         
         <label style="font-weight: bold; display:block; margin-bottom:5px;">粘贴 Google Script URL:</label>
-        <input type="text" id="scriptUrl" placeholder="https://script.google.com/macros/s/AKfycbzjCrd4SIwoR_6M9Dx_3Lgm-Y4xFd8VBgmV2btY-L4XYkuXuUPuDPA2E7BWa8UwADdvFA/exec" />
+        <input type="text" id="scriptUrl" placeholder="https://script.google.com/macros/s/.../exec" />
 
         <div class="controls">
             <label>源语言:</label>
@@ -60,7 +64,7 @@
             </select>
             <div style="display:flex; align-items:center; gap:5px;">
                 <span>➡ 目标:</span>
-                <input type="text" id="targetLangInput" value="zh-CN" placeholder="如: en, ja" style="width: 60px; padding: 8px; margin:0; text-align:center;" title="输入语言代码，例如: en=英语, ja=日语, fr=法语">
+                <input type="text" id="targetLangInput" value="zh-CN" placeholder="如: en, ja" style="width: 60px; padding: 8px; margin:0; text-align:center;" title="输入语言代码">
                 <a href="https://cloud.google.com/translate/docs/languages" target="_blank" style="font-size:12px; text-decoration:none; color:#4285F4;">📋代码表</a>
             </div>
 
@@ -81,9 +85,54 @@
         </div>
     </div>
 
+    <div class="container" style="border-top: 5px solid #34a853;">
+        <h2 style="color: #34a853;">🧲 智能数据匹配 (定点写入)</h2>
+        <p style="color: #666; font-size: 14px; margin-bottom: 20px;">
+            功能：根据关联列（Key），将副表的数据<b>填入到主表指定的某一列</b>（类似 Excel 覆盖粘贴）。
+        </p>
+
+        <div class="vlookup-controls" style="display: flex; gap: 20px; flex-wrap: wrap;">
+            
+            <div class="vlookup-box">
+                <h4>📁 第一步：上传主表 (Target)</h4>
+                <input type="file" id="mainFileInput" accept=".xlsx, .xls, .csv" />
+                <div id="mainFileStatus" style="font-size: 12px; color: gray; margin-top: 5px;">未选择文件</div>
+                
+                <label style="display:block; margin-top:15px; font-weight:bold;">1. 主表关联列 (Key):</label>
+                <select id="mainKeySelect" style="width:100%; margin-top:5px; border:1px solid #999;"><option>请先上传文件</option></select>
+
+                <label style="display:block; margin-top:15px; font-weight:bold; color:#d93025;">2. 数据写入到主表哪一列?</label>
+                <select id="mainTargetSelect" style="width:100%; margin-top:5px; border:2px solid #d93025; background:#fff0f0;"><option>请先上传文件</option></select>
+                <small style="color:gray;">*建议选择一个空列，否则原有数据会被覆盖</small>
+            </div>
+
+            <div class="vlookup-box">
+                <h4>📂 第二步：上传副表 (Source)</h4>
+                <input type="file" id="lookupFileInput" accept=".xlsx, .xls, .csv" />
+                <div id="lookupFileStatus" style="font-size: 12px; color: gray; margin-top: 5px;">未选择文件</div>
+
+                <label style="display:block; margin-top:15px; font-weight:bold;">3. 副表关联列 (Key):</label>
+                <select id="lookupKeySelect" style="width:100%; margin-top:5px; border:1px solid #999;"><option>请先上传文件</option></select>
+
+                <label style="display:block; margin-top:10px; font-weight:bold;">4. 要复制的数据 (Value):</label>
+                <select id="lookupValueSelect" style="width:100%; margin-top:5px; border:1px solid #34a853;"><option>请先上传文件</option></select>
+            </div>
+        </div>
+
+        <div style="margin-top: 25px; text-align: center;">
+            <button id="btnMatch" style="background-color: #34a853; padding: 12px 40px; font-size: 16px;" disabled>开始定点写入</button>
+            <button id="btnExportMerged" style="background-color: #fbbc05; color:#333; padding: 12px 40px; font-size: 16px;" disabled>导出结果</button>
+        </div>
+
+        <div id="matchStatus" class="status" style="text-align: center; margin-top: 15px;">等待操作...</div>
+    </div>
+
     <script>
-        // 🟢 新增：使用 Node.js 方式引入库
         const XLSX = require('xlsx');
+
+        // ==========================================
+        //  👇 模块 1：翻译功能 JS 代码 (保持不变)
+        // ==========================================
         let globalWorkbook = null;
         let globalData = [];
         let selectedColIndex = -1;
@@ -103,38 +152,31 @@
             scriptUrlInput.value = localStorage.getItem('gas_url');
         }
 
-        // --- 1. 修复读取逻辑：改回最安全的自动检测 ---
+        // 1. 读取文件 (带 UTF-8 修复)
         fileInput.addEventListener('change', (e) => {
             const file = e.target.files[0];
             if (!file) return;
             const reader = new FileReader();
-            
             reader.onload = (e) => {
                 try {
                     const data = new Uint8Array(e.target.result);
-                    // ❌ 删除了 {codepage: 65001}，改回自动检测
-                    // 这样无论是 xlsx 还是 csv，库都会自己判断，不会报错了
                     globalWorkbook = XLSX.read(data, {
                         type: 'array',
-                        codepage: 65001 // 65001 代表 UTF-8，这是解决乱码的关键钥匙
+                        codepage: 65001 // 65001 代表 UTF-8
                     });
-                    
                     const ws = globalWorkbook.Sheets[globalWorkbook.SheetNames[0]];
                     globalData = XLSX.utils.sheet_to_json(ws, {header: 1});
-                    
                     if(globalData.length === 0) {
                         statusDiv.innerText = "❌ 文件是空的！";
                         return;
                     }
-                    
                     renderTable();
                     statusDiv.innerText = `✅ 已加载: ${file.name} (共 ${globalData.length} 行)`;
                 } catch(err) {
                     console.error("Read Error:", err);
-                    statusDiv.innerText = `❌ 读取文件失败: ${err.message}\n请检查文件是否被其他软件占用，或尝试另存为标准 .xlsx 格式`;
+                    statusDiv.innerText = `❌ 读取文件失败: ${err.message}`;
                 }
             };
-            
             reader.readAsArrayBuffer(file);
         });
 
@@ -179,7 +221,6 @@
 
         async function fetchBatchTranslate(textArray, sourceLang, targetLang) {
             const apiUrl = scriptUrlInput.value.trim();
-            // 🟢 把 targetLang 放入数据包
             const payload = { texts: textArray, source: sourceLang, target: targetLang };
 
             try {
@@ -191,7 +232,6 @@
                 });
                 
                 const resultText = await response.text();
-                // 尝试解析 JSON，如果出错则打印原始内容以便调试
                 try {
                     const jsonResponse = JSON.parse(resultText);
                     if (jsonResponse.status === "success") {
@@ -216,18 +256,15 @@
             if (!apiUrl) { alert("请先粘贴 Google Script URL"); return; }
             localStorage.setItem('gas_url', apiUrl);
 
-            // 🟢 修复开始：如果是 auto，就变成空字符串
             let sourceLang = sourceLangSelect.value;
             if (sourceLang === 'auto') {
-                sourceLang = "";  // Google 规定：空字符串 = 自动检测
+                sourceLang = ""; 
             }
-            // 🟢 修复结束
 
-            // 🟢 新增：获取目标语言输入框
             const targetLangInput = document.getElementById('targetLangInput');
-            let targetLang = targetLangInput.value.trim(); // 去除空格
+            let targetLang = targetLangInput.value.trim();
             if (!targetLang) {
-                targetLang = "zh-CN"; // 如果用户删空了，默认回中文
+                targetLang = "zh-CN";
             }
             
             btnTranslate.disabled = true;
@@ -275,7 +312,6 @@
             btnExportCSV.disabled = false;
         });
 
-        // 2. 导出 Excel
         btnExport.addEventListener('click', () => {
             const newSheet = XLSX.utils.aoa_to_sheet(globalData);
             const newWorkbook = XLSX.utils.book_new();
@@ -283,11 +319,9 @@
             XLSX.writeFile(newWorkbook, "Translated_Result.xlsx");
         });
 
-        // 3. 导出 CSV (带 BOM 头，解决乱码)
         btnExportCSV.addEventListener('click', () => {
             const ws = XLSX.utils.aoa_to_sheet(globalData);
             const csvContent = XLSX.utils.sheet_to_csv(ws);
-            // 🌟 手动添加 BOM 头
             const blob = new Blob(["\uFEFF" + csvContent], { type: 'text/csv;charset=utf-8;' });
             const link = document.createElement("a");
             const url = URL.createObjectURL(blob);
@@ -297,6 +331,177 @@
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
+        });
+
+        // ==========================================
+        //  👇 模块 2：智能匹配 (VLOOKUP 定点写入版)
+        // ==========================================
+        
+        let mainTableData = [];
+        let lookupTableData = [];
+        let mergedData = [];
+
+        // 获取元素
+        const mainFileInput = document.getElementById('mainFileInput');
+        const lookupFileInput = document.getElementById('lookupFileInput');
+        
+        const mainKeySelect = document.getElementById('mainKeySelect');
+        const mainTargetSelect = document.getElementById('mainTargetSelect'); // 🟢 新增：目标写入列
+        
+        const lookupKeySelect = document.getElementById('lookupKeySelect');
+        const lookupValueSelect = document.getElementById('lookupValueSelect');
+        
+        const btnMatch = document.getElementById('btnMatch');
+        const btnExportMerged = document.getElementById('btnExportMerged');
+        const matchStatus = document.getElementById('matchStatus');
+
+        // 通用读取函数
+        function readExcelForVlookup(file, callback) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array', codepage: 65001 });
+                    const ws = workbook.Sheets[workbook.SheetNames[0]];
+                    const jsonData = XLSX.utils.sheet_to_json(ws, { header: 1 });
+                    callback(jsonData);
+                } catch (err) {
+                    alert("读取失败: " + err.message);
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        // 填充下拉菜单
+        function populateSelect(selectElement, headers) {
+            selectElement.innerHTML = '';
+            headers.forEach((header, index) => {
+                const option = document.createElement('option');
+                option.value = index;
+                option.text = header ? String(header).substring(0,30) : `Column ${index + 1}`;
+                selectElement.appendChild(option);
+            });
+        }
+
+        // 监听主表
+        mainFileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            document.getElementById('mainFileStatus').innerText = "✅ " + file.name;
+            readExcelForVlookup(file, (data) => {
+                mainTableData = data;
+                if (data.length > 0) {
+                    populateSelect(mainKeySelect, data[0]);     // 关联列
+                    populateSelect(mainTargetSelect, data[0]);  // 🟢 目标写入列
+                    checkReady();
+                }
+            });
+        });
+
+        // 监听副表
+        lookupFileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            document.getElementById('lookupFileStatus').innerText = "✅ " + file.name;
+            readExcelForVlookup(file, (data) => {
+                lookupTableData = data;
+                if (data.length > 0) {
+                    populateSelect(lookupKeySelect, data[0]);
+                    populateSelect(lookupValueSelect, data[0]);
+                    checkReady();
+                }
+            });
+        });
+
+        function checkReady() {
+            if (mainTableData.length > 0 && lookupTableData.length > 0) {
+                btnMatch.disabled = false;
+                matchStatus.innerText = "就绪！请选择好 4 个下拉选项。";
+            }
+        }
+
+        // 🟢 核心逻辑：定点覆盖
+        btnMatch.addEventListener('click', () => {
+            const mainKeyIndex = parseInt(mainKeySelect.value);
+            const mainTargetIndex = parseInt(mainTargetSelect.value); // 获取写入位置
+            const lookupKeyIndex = parseInt(lookupKeySelect.value);
+            const lookupValueIndex = parseInt(lookupValueSelect.value);
+
+            if (isNaN(mainKeyIndex) || isNaN(mainTargetIndex) || isNaN(lookupKeyIndex) || isNaN(lookupValueIndex)) {
+                alert("请确保所有 4 个下拉选项都已选择！");
+                return;
+            }
+
+            // 安全检查：防止把 Key 列给覆盖了
+            if (mainKeyIndex === mainTargetIndex) {
+                if(!confirm("⚠️ 警告：\n你选择的【写入列】和【关联列】是同一列！\n\n这会导致原本用来匹配的 ID 被覆盖掉。\n你确定要这样做吗？")) {
+                    return;
+                }
+            }
+
+            matchStatus.innerText = "⏳ 正在构建索引...";
+
+            // A. 建立索引
+            const lookupMap = new Map();
+            for (let i = 1; i < lookupTableData.length; i++) {
+                const row = lookupTableData[i];
+                let rawKey = row[lookupKeyIndex];
+                let key = (rawKey === undefined || rawKey === null) ? "" : String(rawKey).trim().toUpperCase();
+                
+                let value = row[lookupValueIndex];
+                if (value === undefined || value === null) value = ""; 
+                
+                if (key) {
+                    lookupMap.set(key, value);
+                }
+            }
+
+            // B. 遍历并覆盖
+            mergedData = JSON.parse(JSON.stringify(mainTableData)); // 深拷贝
+            let matchCount = 0;
+
+            for (let i = 1; i < mergedData.length; i++) {
+                const row = mergedData[i];
+                let rawMainKey = row[mainKeyIndex];
+                let key = (rawMainKey === undefined || rawMainKey === null) ? "" : String(rawMainKey).trim().toUpperCase();
+                
+                if (lookupMap.has(key)) {
+                    const matchedValue = lookupMap.get(key);
+                    
+                    // 🟢 关键修改：直接写入到指定的列，而不是 push 到最后
+                    // 如果该行长度不够，先补齐空字符串，防止报错
+                    while (row.length <= mainTargetIndex) {
+                        row.push("");
+                    }
+                    
+                    row[mainTargetIndex] = matchedValue; // 👈 这里执行覆盖写入
+                    matchCount++;
+                }
+                // 💡 注意：如果没有匹配到，这里保持原状，不动它
+            }
+
+            if (matchCount === 0) {
+                alert("⚠️ 匹配结果为 0 条！请检查关联列是否选对。");
+                matchStatus.innerText = "❌ 匹配失败：0 条数据。";
+            } else {
+                alert(`✅ 写入成功！\n\n共覆盖/填入了 ${matchCount} 条数据。\n请导出查看。`);
+                matchStatus.innerText = `✅ 完成！共写入 ${matchCount} 条。请点击黄色按钮导出。`;
+                btnExportMerged.disabled = false;
+            }
+        });
+
+        // 导出 (带报错检测)
+        btnExportMerged.addEventListener('click', () => {
+            try {
+                if (!mergedData || mergedData.length === 0) return;
+                const newSheet = XLSX.utils.aoa_to_sheet(mergedData);
+                const newWorkbook = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(newWorkbook, newSheet, "MergedData");
+                XLSX.writeFile(newWorkbook, "Vlookup_Result.xlsx");
+                alert("✅ 导出成功！");
+            } catch (err) {
+                alert("❌ 导出失败：请关闭正在打开的 Excel 文件重试！");
+            }
         });
 
     </script>
